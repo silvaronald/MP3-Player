@@ -10,6 +10,7 @@ import javax.swing.event.MouseInputAdapter;
 import java.awt.*;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
+import java.io.IOException;
 
 public class Player {
 
@@ -28,17 +29,55 @@ public class Player {
 
     private PlayerWindow window;
 
+    private String TITULO_DA_JANELA = "Deezer Inc.";
+
+    private String[][] LISTA_DE_REPRODUÇÃO;
+
     private int currentFrame = 0;
 
-    private final ActionListener buttonListenerPlayNow = e -> ;
-    private final ActionListener buttonListenerRemove = e -> ;
-    private final ActionListener buttonListenerAddSong = e -> ;
-    private final ActionListener buttonListenerPlayPause = e -> ;
-    private final ActionListener buttonListenerStop = e -> ;
-    private final ActionListener buttonListenerNext = e -> ;
-    private final ActionListener buttonListenerPrevious = e -> ;
-    private final ActionListener buttonListenerShuffle = e -> ;
-    private final ActionListener buttonListenerLoop = e -> ;
+    private final ActionListener buttonListenerPlayNow =
+            e -> new Thread(() -> {
+                });
+    private final ActionListener buttonListenerRemove =
+            e -> new Thread(() -> {
+                });
+    private final ActionListener buttonListenerAddSong = e -> {
+        try {
+            Song addedSong = window.openFileChooser();
+
+            String[] addedSongInfo = addedSong.getDisplayInfo();
+
+            LISTA_DE_REPRODUÇÃO.append(addedSongInfo);
+
+            window.setQueueList(LISTA_DE_REPRODUÇÃO);
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        } catch (BitstreamException ex) {
+            throw new RuntimeException(ex);
+        } catch (UnsupportedTagException ex) {
+            throw new RuntimeException(ex);
+        } catch (InvalidDataException ex) {
+            throw new RuntimeException(ex);
+        }
+    };
+    private final ActionListener buttonListenerPlayPause =
+            e -> new Thread(() -> {
+                });
+    private final ActionListener buttonListenerStop =
+            e -> new Thread(() -> {
+                });
+    private final ActionListener buttonListenerNext =
+            e -> new Thread(() -> {
+                });
+    private final ActionListener buttonListenerPrevious =
+            e -> new Thread(() -> {
+                });
+    private final ActionListener buttonListenerShuffle =
+            e -> new Thread(() -> {
+                });
+    private final ActionListener buttonListenerLoop =
+            e -> new Thread(() -> {
+                });
     private final MouseInputAdapter scrubberMouseInputAdapter = new MouseInputAdapter() {
         @Override
         public void mouseReleased(MouseEvent e) {
