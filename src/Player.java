@@ -40,9 +40,21 @@ public class Player {
 
     private int currentFrame = 0;
 
-    private Thread playThread;
+    private Thread playThread = new Thread();
 
     private final ActionListener buttonListenerPlayNow = e -> {
+        playThread.interrupt();
+        if (bitstream != null){
+            try {
+
+                bitstream.close();
+                device.close();
+            } catch (BitstreamException bitstreamException) {
+                bitstreamException.printStackTrace();
+            }
+
+        }
+
         int real_position = -1;
 
         for (int i = 0; i < songsInfo.length; i++) {
@@ -65,11 +77,11 @@ public class Player {
         }
         currentFrame = 0;
         int finalReal_position = real_position;
+        window.setPlayingSongInfo(songsInfo[real_position][0], songsInfo[real_position][1], songsInfo[real_position][2]);
 
-        Thread playThread = new Thread((int final_real_position)
+        playThread = new Thread(()
                 -> {
             while (true) {
-                window.setPlayingSongInfo(songsInfo[final_real_position][0], songsInfo[final_real_position][1], songsInfo[final_real_position][2]);
                 try {
                     if (!playNextFrame()) break;
                 } catch (JavaLayerException ex) {
@@ -80,7 +92,6 @@ public class Player {
         });
 
         playThread.start();
-        playThread.interrupt();
 
     };
     private final ActionListener buttonListenerRemove =
