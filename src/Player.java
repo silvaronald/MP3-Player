@@ -10,7 +10,10 @@ import javax.swing.event.MouseInputAdapter;
 import java.awt.*;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Objects;
 
 public class Player {
 
@@ -29,15 +32,57 @@ public class Player {
 
     private PlayerWindow window;
 
-    private String TITULO_DA_JANELA = "Deezer Inc.";
+    private String windowTitle = "Deezer Inc.";
 
-    private String[][] LISTA_DE_REPRODUÇÃO;
+    private String[][] songsInfo;
+
+    private Song[] songs;
 
     private int currentFrame = 0;
 
-    private final ActionListener buttonListenerPlayNow =
-            e -> new Thread(() -> {
-                });
+    private Thread playThread;
+
+    private final ActionListener buttonListenerPlayNow = e -> {
+        int real_position = -1;
+
+        for (int i = 0; i < songsInfo.length; i++) {
+            String address = songsInfo[i][5];
+            if (Objects.equals(address, window.getSelectedSong())){
+                real_position = i;
+            }
+        }
+
+        Song selected_song = songs[real_position];
+
+        try {
+            this.device = FactoryRegistry.systemRegistry().createAudioDevice();
+            this.device.open(this.decoder = new Decoder());
+            this.bitstream = new Bitstream(selected_song.getBufferedInputStream());
+        } catch (JavaLayerException ex) {
+            throw new RuntimeException(ex);
+        } catch (FileNotFoundException ex) {
+            throw new RuntimeException(ex);
+        }
+        currentFrame = 0;
+        int finalReal_position = real_position;
+
+        Thread playThread = new Thread((int final_real_position)
+                -> {
+            while (true) {
+                window.setPlayingSongInfo(songsInfo[final_real_position][0], songsInfo[final_real_position][1], songsInfo[final_real_position][2]);
+                try {
+                    if (!playNextFrame()) break;
+                } catch (JavaLayerException ex) {
+                    throw new RuntimeException(ex);
+                }
+
+            }
+        });
+
+        playThread.start();
+        playThread.interrupt();
+
+    };
     private final ActionListener buttonListenerRemove =
             e -> new Thread(() -> {
                 });
@@ -47,9 +92,26 @@ public class Player {
 
             String[] addedSongInfo = addedSong.getDisplayInfo();
 
-            LISTA_DE_REPRODUÇÃO.append(addedSongInfo);
+            if (songs != null) {
+                songs = Arrays.copyOf(songs, songs.length + 1);
+                songs[songs.length -1] = addedSong;
+            }
 
-            window.setQueueList(LISTA_DE_REPRODUÇÃO);
+            else {
+                songs = new Song[]{addedSong};
+            }
+
+            if (songsInfo != null){
+                songsInfo = Arrays.copyOf(songsInfo, songsInfo.length + 1);
+                songsInfo[songsInfo.length -1] = addedSongInfo;
+            }
+
+            else {
+                songsInfo = new String[][]{addedSongInfo};
+            }
+
+            window.setQueueList(songsInfo);
+
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         } catch (BitstreamException ex) {
@@ -94,8 +156,8 @@ public class Player {
 
     public Player() {
         EventQueue.invokeLater(() -> window = new PlayerWindow(
-                TITULO_DA_JANELA,
-                LISTA_DE_REPRODUÇÃO,
+                windowTitle,
+                songsInfo,
                 buttonListenerPlayNow,
                 buttonListenerRemove,
                 buttonListenerAddSong,
