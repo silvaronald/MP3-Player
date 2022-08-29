@@ -38,6 +38,7 @@ public class Player {
 
     private Song[] songs;
 
+    private int index_actual_song = -1;
     private int currentFrame = 0;
 
     private Thread playThread = new Thread();
@@ -65,6 +66,8 @@ public class Player {
         }
 
         Song selected_song = songs[real_position];
+
+        index_actual_song = real_position;
 
         try {
             this.device = FactoryRegistry.systemRegistry().createAudioDevice();
@@ -94,9 +97,29 @@ public class Player {
         playThread.start();
 
     };
-    private final ActionListener buttonListenerRemove =
-            e -> new Thread(() -> {
-                });
+    private final ActionListener buttonListenerRemove = e ->  {
+
+        int real_position = -1;
+
+        for (int i = 0; i < songsInfo.length; i++) {
+            String address = songsInfo[i][5];
+            if (Objects.equals(address, window.getSelectedSong())){ // Musica que eu cliquei
+                real_position = i;
+            }
+        }
+
+        if (real_position == index_actual_song){
+            playThread.stop();
+            index_actual_song = -1;
+
+        }
+        System.out.println(songsInfo.length);
+        deleteSong(real_position);
+        window.resetMiniPlayer();
+
+
+
+    };
     private final ActionListener buttonListenerAddSong = e -> {
         try {
             Song addedSong = window.openFileChooser();
@@ -183,6 +206,26 @@ public class Player {
     }
 
     //<editor-fold desc="Essential">
+
+    private void deleteSong(int index){
+            Song[] aux_song = new Song[songs.length-1];
+            String[][] aux_song_info = new String[songsInfo.length -1][];
+            int counter = 0;
+            for (int i = 0; i < songs.length; i++){
+                if(i != index){
+                    aux_song[counter] = songs[counter];
+                    aux_song_info[counter] = songsInfo[counter];
+                    counter ++;
+                }
+
+            }
+            songs = aux_song;
+            songsInfo = aux_song_info;
+            window.setQueueList(songsInfo);
+
+
+
+    }
 
     /**
      * @return False if there are no more frames to play.
