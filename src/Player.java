@@ -37,14 +37,26 @@ public class Player {
     private String[][] songsInfo;
 
     private Song[] songs;
-
-    private int index_actual_song = -1;
+    
+    // Guarda o index da música que está sendo reproduzida
+    private int currentSongIndex;
+    
     private int currentFrame = 0;
 
-    private Thread playThread = new Thread();
+    // Thread usada para reproduzir músicas
+    private Thread playThread = new Thread(() -> {
+        while (true) {
+            try {
+                if (!playNextFrame()) break;
+            } catch (JavaLayerException ex) {
+                throw new RuntimeException(ex);
+            }
+        };
+    });
 
     private final ActionListener buttonListenerPlayNow = e -> {
-        playThread.interrupt();
+        stopPlaying();
+
         if (bitstream != null){
             try {
 
@@ -67,7 +79,7 @@ public class Player {
 
         Song selected_song = songs[real_position];
 
-        index_actual_song = real_position;
+        currentSongIndex = real_position;
 
         try {
             this.device = FactoryRegistry.systemRegistry().createAudioDevice();
@@ -82,20 +94,7 @@ public class Player {
         int finalReal_position = real_position;
         window.setPlayingSongInfo(songsInfo[real_position][0], songsInfo[real_position][1], songsInfo[real_position][2]);
 
-        playThread = new Thread(()
-                -> {
-            while (true) {
-                try {
-                    if (!playNextFrame()) break;
-                } catch (JavaLayerException ex) {
-                    throw new RuntimeException(ex);
-                }
-
-            }
-        });
-
-        playThread.start();
-
+        startPlaying();
     };
     private final ActionListener buttonListenerRemove = e ->  {
 
@@ -108,9 +107,9 @@ public class Player {
             }
         }
 
-        if (real_position == index_actual_song){
+        if (real_position == currentSongIndex){
             playThread.stop();
-            index_actual_song = -1;
+            currentSongIndex = -1;
 
         }
         System.out.println(songsInfo.length);
@@ -156,12 +155,22 @@ public class Player {
             throw new RuntimeException(ex);
         }
     };
-    private final ActionListener buttonListenerPlayPause =
-            e -> new Thread(() -> {
-                });
-    private final ActionListener buttonListenerStop =
-            e -> new Thread(() -> {
-                });
+    private final ActionListener buttonListenerPlayPause = e -> {
+
+    };
+
+    // Para a reprodução da música atual
+    private final ActionListener buttonListenerStop = e -> {
+        // Para a reprodução de músicas
+        stopPlaying();
+
+        // Deixa a aba de informações da música em branco
+        window.resetMiniPlayer();
+
+        // Deixa o botão "Play/Pause" desabilitado e com ícone de Play
+        window.setPlayPauseButtonIcon(0);
+        window.setEnabledPlayPauseButton(false);
+    };
     private final ActionListener buttonListenerNext =
             e -> new Thread(() -> {
                 });
@@ -268,6 +277,32 @@ public class Player {
             boolean condition = true;
             while (framesToSkip-- > 0 && condition) condition = skipNextFrame();
         }
+    }
+
+    // Função usada para interromper a reprodução das músicas
+    private void stopPlaying() {
+        // Interrompe a thread
+        playThread.interrupt();
+
+        // Deixa o botão "Play/Pause" desabilitado e com ícone de Play
+        window.setEnabledPlayPauseButton(false);
+        window.setPlayPauseButtonIcon(0);
+
+        // Desabilita o botão Stop
+        window.setEnabledStopButton(false);
+    }
+
+    // Função usada para iniciar a reprodução das músicas
+    private void startPlaying() {
+        // Inicia a thread
+        playThread.start();
+
+        // Deixa o botão "Play/Pause" habilitado e com ícone de Pause
+        window.setEnabledPlayPauseButton(true);
+        window.setPlayPauseButtonIcon(1);
+
+        // Habilita o botão Stop
+        window.setEnabledStopButton(true);
     }
     //</editor-fold>
 }
