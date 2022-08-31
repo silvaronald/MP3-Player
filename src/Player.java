@@ -34,97 +34,52 @@ public class Player {
 
     private String windowTitle = "Deezer Inc.";
 
+    // Guarda as músicas da lista de reprodução
+    private Song[] songs;
+
+    // Guarda as informações das músicas da lista de reprodução
     private String[][] songsInfo;
 
-    private Song[] songs;
-    
     // Guarda o index da música que está sendo reproduzida
     private int currentSongIndex;
     
     private int currentFrame = 0;
 
-    // Thread usada para reproduzir músicas
-    private Thread playThread = new Thread(() -> {
-        while (true) {
-            try {
-                if (!playNextFrame()) break;
-            } catch (JavaLayerException ex) {
-                throw new RuntimeException(ex);
-            }
-        };
-    });
+    // True quando a música está pausada
+    private boolean paused = false;
 
+    // Thread usada para reproduzir músicas
+    private Thread playThread = new Thread();
+
+    // Começa a reproduzir a música selecionada
     private final ActionListener buttonListenerPlayNow = e -> {
         stopPlaying();
 
-        if (bitstream != null){
-            try {
-
-                bitstream.close();
-                device.close();
-            } catch (BitstreamException bitstreamException) {
-                bitstreamException.printStackTrace();
-            }
-
-        }
-
-        int real_position = -1;
-
-        for (int i = 0; i < songsInfo.length; i++) {
-            String address = songsInfo[i][5];
-            if (Objects.equals(address, window.getSelectedSong())){
-                real_position = i;
-            }
-        }
-
-        Song selected_song = songs[real_position];
-
-        currentSongIndex = real_position;
-
-        try {
-            this.device = FactoryRegistry.systemRegistry().createAudioDevice();
-            this.device.open(this.decoder = new Decoder());
-            this.bitstream = new Bitstream(selected_song.getBufferedInputStream());
-        } catch (JavaLayerException ex) {
-            throw new RuntimeException(ex);
-        } catch (FileNotFoundException ex) {
-            throw new RuntimeException(ex);
-        }
-        currentFrame = 0;
-        int finalReal_position = real_position;
-        window.setPlayingSongInfo(songsInfo[real_position][0], songsInfo[real_position][1], songsInfo[real_position][2]);
-
-        startPlaying();
+        startPlaying(getSelectedSongIndex());
     };
+
+    // Remove a música selecionada
     private final ActionListener buttonListenerRemove = e ->  {
+        int selectedSongIndex = getSelectedSongIndex();
 
-        int real_position = -1;
+        // Se a música deletada for a que estiver tocando, a thread de reprodução deve ser parada
+        if (selectedSongIndex == currentSongIndex) {
+            stopPlaying();
 
-        for (int i = 0; i < songsInfo.length; i++) {
-            String address = songsInfo[i][5];
-            if (Objects.equals(address, window.getSelectedSong())){ // Musica que eu cliquei
-                real_position = i;
-            }
-        }
-
-        if (real_position == currentSongIndex){
-            playThread.stop();
             currentSongIndex = -1;
-
         }
-        System.out.println(songsInfo.length);
-        deleteSong(real_position);
-        window.resetMiniPlayer();
 
-
-
+        deleteSong(selectedSongIndex);
     };
+
+    // Adiciona uma música ao final da lista de reprodução
     private final ActionListener buttonListenerAddSong = e -> {
         try {
             Song addedSong = window.openFileChooser();
 
             String[] addedSongInfo = addedSong.getDisplayInfo();
 
+            // Adiciona a música no array songs
             if (songs != null) {
                 songs = Arrays.copyOf(songs, songs.length + 1);
                 songs[songs.length -1] = addedSong;
@@ -134,6 +89,7 @@ public class Player {
                 songs = new Song[]{addedSong};
             }
 
+            // Adiciona as informações da música no array songsInfo
             if (songsInfo != null){
                 songsInfo = Arrays.copyOf(songsInfo, songsInfo.length + 1);
                 songsInfo[songsInfo.length -1] = addedSongInfo;
@@ -143,46 +99,50 @@ public class Player {
                 songsInfo = new String[][]{addedSongInfo};
             }
 
+            // Atualiza a lista de reprodução
             window.setQueueList(songsInfo);
 
-        } catch (IOException ex) {
-            throw new RuntimeException(ex);
-        } catch (BitstreamException ex) {
-            throw new RuntimeException(ex);
-        } catch (UnsupportedTagException ex) {
-            throw new RuntimeException(ex);
-        } catch (InvalidDataException ex) {
+        } catch (IOException | InvalidDataException | BitstreamException | UnsupportedTagException ex) {
             throw new RuntimeException(ex);
         }
     };
+
+    // Botão de pausar/despausar
     private final ActionListener buttonListenerPlayPause = e -> {
+        if (paused) {
+            // Deixa o botão Play/Pause com o ícone de pause
+            window.setPlayPauseButtonIcon(1);
 
+            // Despausa a música
+            paused = false;
+        }
+
+        else {
+            // Deixa o botão Play/Pause com o ícone de play
+            window.setPlayPauseButtonIcon(0);
+
+            // Pausa a música
+            paused = true;
+        }
     };
 
-    // Para a reprodução da música atual
+    // Para a reprodução atual
     private final ActionListener buttonListenerStop = e -> {
-        // Para a reprodução de músicas
         stopPlaying();
-
-        // Deixa a aba de informações da música em branco
-        window.resetMiniPlayer();
-
-        // Deixa o botão "Play/Pause" desabilitado e com ícone de Play
-        window.setPlayPauseButtonIcon(0);
-        window.setEnabledPlayPauseButton(false);
     };
-    private final ActionListener buttonListenerNext =
-            e -> new Thread(() -> {
-                });
-    private final ActionListener buttonListenerPrevious =
-            e -> new Thread(() -> {
-                });
-    private final ActionListener buttonListenerShuffle =
-            e -> new Thread(() -> {
-                });
-    private final ActionListener buttonListenerLoop =
-            e -> new Thread(() -> {
-                });
+
+    private final ActionListener buttonListenerNext = e -> {
+        // TODO
+    };
+    private final ActionListener buttonListenerPrevious = e -> {
+        // TODO
+    };
+    private final ActionListener buttonListenerShuffle = e -> {
+        // TODO
+    };
+    private final ActionListener buttonListenerLoop = e -> {
+        // TODO
+    };
     private final MouseInputAdapter scrubberMouseInputAdapter = new MouseInputAdapter() {
         @Override
         public void mouseReleased(MouseEvent e) {
@@ -215,27 +175,6 @@ public class Player {
     }
 
     //<editor-fold desc="Essential">
-
-    private void deleteSong(int index){
-            Song[] aux_song = new Song[songs.length-1];
-            String[][] aux_song_info = new String[songsInfo.length -1][];
-            int counter = 0;
-            for (int i = 0; i < songs.length; i++){
-                if(i != index){
-                    aux_song[counter] = songs[counter];
-                    aux_song_info[counter] = songsInfo[counter];
-                    counter ++;
-                }
-
-            }
-            songs = aux_song;
-            songsInfo = aux_song_info;
-            window.setQueueList(songsInfo);
-
-
-
-    }
-
     /**
      * @return False if there are no more frames to play.
      */
@@ -282,7 +221,7 @@ public class Player {
     // Função usada para interromper a reprodução das músicas
     private void stopPlaying() {
         // Interrompe a thread
-        playThread.interrupt();
+        playThread.stop();
 
         // Deixa o botão "Play/Pause" desabilitado e com ícone de Play
         window.setEnabledPlayPauseButton(false);
@@ -290,19 +229,104 @@ public class Player {
 
         // Desabilita o botão Stop
         window.setEnabledStopButton(false);
+
+        // Deixa a aba de informações da música em branco
+        window.resetMiniPlayer();
+
+        // Fecha o device e a bitstream
+        if (bitstream != null){
+            try {
+                bitstream.close();
+                device.close();
+            } catch (BitstreamException bitstreamException) {
+                bitstreamException.printStackTrace();
+            }
+        }
     }
 
     // Função usada para iniciar a reprodução das músicas
-    private void startPlaying() {
-        // Inicia a thread
-        playThread.start();
-
+    private void startPlaying(int songIndex) {
         // Deixa o botão "Play/Pause" habilitado e com ícone de Pause
         window.setEnabledPlayPauseButton(true);
         window.setPlayPauseButtonIcon(1);
 
         // Habilita o botão Stop
         window.setEnabledStopButton(true);
+
+        currentSongIndex = songIndex;
+
+        Song selected_song = songs[songIndex];
+
+        // Cria a bitstream e o device
+        try {
+            device = FactoryRegistry.systemRegistry().createAudioDevice();
+            device.open(this.decoder = new Decoder());
+            bitstream = new Bitstream(selected_song.getBufferedInputStream());
+        } catch (JavaLayerException | FileNotFoundException ex) {
+            throw new RuntimeException(ex);
+        }
+
+        currentFrame = 0;
+
+        // Mostra as informações da música
+        window.setPlayingSongInfo(songsInfo[songIndex][0], songsInfo[songIndex][1], songsInfo[songIndex][2]);
+
+        // Inicia a thread
+        playThread = new Thread(() -> {
+            while (true) {
+                try {
+                    if (!paused) {
+                        if (!playNextFrame()) {
+                            window.resetMiniPlayer();
+                            break;
+                        }
+                    }
+                } catch (JavaLayerException ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
+        });
+
+        playThread.start();
     }
     //</editor-fold>
+
+    // Retorna o index na lista de reprodução da música selecionada
+    private int getSelectedSongIndex() {
+        for (int i = 0; i < songsInfo.length; i++) {
+            String address = songsInfo[i][5];
+            if (Objects.equals(address, window.getSelectedSong())){ // Musica clicada
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    // Deleta a música selecionada da lista de reprodução
+    private void deleteSong(int index){
+        // Faz cópias dos arrays songs e songsInfo deixando de fora o index a ser excluído
+        Song[] aux_song = new Song[songs.length-1];
+
+        String[][] aux_song_info = new String[songsInfo.length -1][];
+
+        int counter = 0;
+
+        for (int i = 0; i < songs.length; i++){
+            if(i != index){
+                aux_song[counter] = songs[counter];
+                aux_song_info[counter] = songsInfo[counter];
+                counter ++;
+            }
+        }
+
+        songs = aux_song;
+        songsInfo = aux_song_info;
+
+        // Atualiza o currentSongIndex
+        if (index < currentSongIndex) {
+            currentSongIndex--;
+        }
+
+        window.setQueueList(songsInfo);
+    }
 }
