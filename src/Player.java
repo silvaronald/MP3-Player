@@ -15,6 +15,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Objects;
 
+import static support.PlayerWindow.*;
+
 public class Player {
 
     /**
@@ -221,7 +223,7 @@ public class Player {
     // Função usada para interromper a reprodução das músicas
     private void stopPlaying() {
         // Interrompe a thread
-        playThread.stop();
+        playThread.interrupt();
 
         // Deixa o botão "Play/Pause" desabilitado e com ícone de Play
         window.setEnabledPlayPauseButton(false);
@@ -229,9 +231,6 @@ public class Player {
 
         // Desabilita o botão Stop
         window.setEnabledStopButton(false);
-
-        // Deixa a aba de informações da música em branco
-        window.resetMiniPlayer();
 
         // Fecha o device e a bitstream
         if (bitstream != null){
@@ -242,6 +241,11 @@ public class Player {
                 bitstreamException.printStackTrace();
             }
         }
+
+        // Deixa a aba de informações da música em branco
+        window.resetMiniPlayer();
+
+        paused = false;
     }
 
     // Função usada para iniciar a reprodução das músicas
@@ -273,13 +277,19 @@ public class Player {
 
         // Inicia a thread
         playThread = new Thread(() -> {
+            int totalTime = (int) songs[currentSongIndex].getMsLength();
             while (true) {
                 try {
                     if (!paused) {
+                        int currentTime = (int) (songs[currentSongIndex].getMsPerFrame() * currentFrame);
+                        window.setTime(currentTime, totalTime);
+
                         if (!playNextFrame()) {
                             window.resetMiniPlayer();
                             break;
                         }
+
+                        currentFrame++;
                     }
                 } catch (JavaLayerException ex) {
                     throw new RuntimeException(ex);
@@ -305,22 +315,22 @@ public class Player {
     // Deleta a música selecionada da lista de reprodução
     private void deleteSong(int index){
         // Faz cópias dos arrays songs e songsInfo deixando de fora o index a ser excluído
-        Song[] aux_song = new Song[songs.length-1];
+        Song[] auxSongs = new Song[songs.length-1];
 
-        String[][] aux_song_info = new String[songsInfo.length -1][];
+        String[][] auxSongsInfo = new String[songsInfo.length -1][];
 
         int counter = 0;
 
         for (int i = 0; i < songs.length; i++){
             if(i != index){
-                aux_song[counter] = songs[counter];
-                aux_song_info[counter] = songsInfo[counter];
+                auxSongs[counter] = songs[counter];
+                auxSongsInfo[counter] = songsInfo[counter];
                 counter ++;
             }
         }
 
-        songs = aux_song;
-        songsInfo = aux_song_info;
+        songs = auxSongs;
+        songsInfo = auxSongsInfo;
 
         // Atualiza o currentSongIndex
         if (index < currentSongIndex) {
