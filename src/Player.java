@@ -66,12 +66,15 @@ public class Player {
 
         // Se a música deletada for a que estiver tocando, a thread de reprodução deve ser parada
         if (selectedSongIndex == currentSongIndex) {
-            stopPlaying();
+            deleteSong(selectedSongIndex);
 
-            currentSongIndex = -1;
+            stopPlaying();
+        }
+        else {
+            deleteSong(selectedSongIndex);
         }
 
-        deleteSong(selectedSongIndex);
+        window.setQueueList(songsInfo);
     };
 
     // Adiciona uma música ao final da lista de reprodução
@@ -277,21 +280,27 @@ public class Player {
 
         // Inicia a thread
         playThread = new Thread(() -> {
+            // Tempo total da música
             int totalTime = (int) songs[currentSongIndex].getMsLength();
             while (true) {
                 try {
                     if (!paused) {
+                        // Tempo atual da música
                         int currentTime = (int) (songs[currentSongIndex].getMsPerFrame() * currentFrame);
+
+                        // Contador de tempo
                         window.setTime(currentTime, totalTime);
 
                         if (!playNextFrame()) {
                             window.resetMiniPlayer();
-                            break;
+                            stopPlaying();
                         }
 
                         currentFrame++;
                     }
                 } catch (JavaLayerException ex) {
+                    stopPlaying();
+
                     throw new RuntimeException(ex);
                 }
             }
@@ -323,8 +332,8 @@ public class Player {
 
         for (int i = 0; i < songs.length; i++){
             if(i != index){
-                auxSongs[counter] = songs[counter];
-                auxSongsInfo[counter] = songsInfo[counter];
+                auxSongs[counter] = songs[i];
+                auxSongsInfo[counter] = songsInfo[i];
                 counter ++;
             }
         }
@@ -336,7 +345,5 @@ public class Player {
         if (index < currentSongIndex) {
             currentSongIndex--;
         }
-
-        window.setQueueList(songsInfo);
     }
 }
