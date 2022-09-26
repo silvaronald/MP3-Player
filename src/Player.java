@@ -14,6 +14,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static support.PlayerWindow.*;
 
@@ -46,6 +47,9 @@ public class Player {
     private int currentSongIndex;
     
     private int currentFrame = 0;
+
+    // Lock utilizado para controlar os acessos às bitstreams
+    private ReentrantLock bitstreamLock = new ReentrantLock();
 
     // True quando a música está pausada
     private boolean paused = false;
@@ -185,15 +189,22 @@ public class Player {
      */
     private boolean playNextFrame() throws JavaLayerException {
         // TODO Is this thread safe?
-        if (device != null) {
-            Header h = bitstream.readFrame();
-            if (h == null) return false;
+        bitstreamLock.lock();
 
-            SampleBuffer output = (SampleBuffer) decoder.decodeFrame(h, bitstream);
-            device.write(output.getBuffer(), 0, output.getBufferLength());
-            bitstream.closeFrame();
+        try {
+            if (device != null) {
+                Header h = bitstream.readFrame();
+                if (h == null) return false;
+
+                SampleBuffer output = (SampleBuffer) decoder.decodeFrame(h, bitstream);
+                device.write(output.getBuffer(), 0, output.getBufferLength());
+                bitstream.closeFrame();
+            }
+            return true;
         }
-        return true;
+        finally {
+            bitstreamLock.unlock();
+        }
     }
 
     /**
@@ -201,11 +212,18 @@ public class Player {
      */
     private boolean skipNextFrame() throws BitstreamException {
         // TODO Is this thread safe?
-        Header h = bitstream.readFrame();
-        if (h == null) return false;
-        bitstream.closeFrame();
-        currentFrame++;
-        return true;
+        bitstreamLock.lock();
+
+        try {
+            Header h = bitstream.readFrame();
+            if (h == null) return false;
+            bitstream.closeFrame();
+            currentFrame++;
+            return true;
+        }
+        finally {
+            bitstreamLock.unlock();
+        }
     }
 
     /**
@@ -216,10 +234,17 @@ public class Player {
      */
     private void skipToFrame(int newFrame) throws BitstreamException {
         // TODO Is this thread safe?
-        if (newFrame > currentFrame) {
-            int framesToSkip = newFrame - currentFrame;
-            boolean condition = true;
-            while (framesToSkip-- > 0 && condition) condition = skipNextFrame();
+        bitstreamLock.lock();
+
+        try {
+            if (newFrame > currentFrame) {
+                int framesToSkip = newFrame - currentFrame;
+                boolean condition = true;
+                while (framesToSkip-- > 0 && condition) condition = skipNextFrame();
+            }
+        }
+        finally {
+            bitstreamLock.unlock();
         }
     }
 
@@ -269,7 +294,8 @@ public class Player {
             device = FactoryRegistry.systemRegistry().createAudioDevice();
             device.open(this.decoder = new Decoder());
             bitstream = new Bitstream(selected_song.getBufferedInputStream());
-        } catch (JavaLayerException | FileNotFoundException ex) {
+        }
+        catch (JavaLayerException | FileNotFoundException ex) {
             throw new RuntimeException(ex);
         }
 
@@ -291,9 +317,16 @@ public class Player {
                         // Contador de tempo
                         window.setTime(currentTime, totalTime);
 
-                        if (!playNextFrame()) {
-                            window.resetMiniPlayer();
-                            stopPlaying();
+                        bitstreamLock.lock();
+
+                        try {
+                            if (!playNextFrame()) {
+                                window.resetMiniPlayer();
+                                stopPlaying();
+                            }
+                        }
+                        finally {
+                            bitstreamLock.unlock();
                         }
 
                         currentFrame++;
