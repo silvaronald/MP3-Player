@@ -59,26 +59,32 @@ public class Player {
 
     // Começa a reproduzir a música selecionada
     private final ActionListener buttonListenerPlayNow = e -> {
-        stopPlaying();
+        Thread playNowThread = new Thread(() -> {
+            stopPlaying();
 
-        startPlaying(getSelectedSongIndex());
+            startPlaying(getSelectedSongIndex());
+        });
+
+        playNowThread.start();
     };
 
     // Remove a música selecionada
     private final ActionListener buttonListenerRemove = e ->  {
-        int selectedSongIndex = getSelectedSongIndex();
+        Thread removeThread = new Thread( () -> {
+            int selectedSongIndex = getSelectedSongIndex();
 
-        // Se a música deletada for a que estiver tocando, a thread de reprodução deve ser parada
-        if (selectedSongIndex == currentSongIndex) {
-            deleteSong(selectedSongIndex);
+            // Se a música deletada for a que estiver tocando, a thread de reprodução deve ser parada
+            if (selectedSongIndex == currentSongIndex) {
+                deleteSong(selectedSongIndex);
 
-            stopPlaying();
-        }
-        else {
-            deleteSong(selectedSongIndex);
-        }
+                stopPlaying();
+            }
+            else {
+                deleteSong(selectedSongIndex);
+            }
+        });
 
-        window.setQueueList(songsInfo);
+        removeThread.start();
     };
 
     // Adiciona uma música ao final da lista de reprodução
@@ -137,7 +143,11 @@ public class Player {
 
     // Para a reprodução atual
     private final ActionListener buttonListenerStop = e -> {
-        stopPlaying();
+        Thread stopThread = new Thread( () -> {
+            stopPlaying();
+        });
+
+        stopThread.start();
     };
 
     private final ActionListener buttonListenerNext = e -> {
@@ -253,13 +263,6 @@ public class Player {
         // Interrompe a thread
         playThread.interrupt();
 
-        // Deixa o botão "Play/Pause" desabilitado e com ícone de Play
-        window.setEnabledPlayPauseButton(false);
-        window.setPlayPauseButtonIcon(0);
-
-        // Desabilita o botão Stop
-        window.setEnabledStopButton(false);
-
         // Fecha o device e a bitstream
         if (bitstream != null){
             try {
@@ -270,21 +273,24 @@ public class Player {
             }
         }
 
-        // Deixa a aba de informações da música em branco
-        window.resetMiniPlayer();
+        // Atualiza a GUI
+        EventQueue.invokeLater( () -> {
+            // Deixa o botão "Play/Pause" desabilitado e com ícone de Play
+            window.setEnabledPlayPauseButton(false);
+            window.setPlayPauseButtonIcon(0);
+
+            // Desabilita o botão Stop
+            window.setEnabledStopButton(false);
+
+            // Deixa a aba de informações da música em branco
+            window.resetMiniPlayer();
+        });
 
         paused = false;
     }
 
     // Função usada para iniciar a reprodução das músicas
     private void startPlaying(int songIndex) {
-        // Deixa o botão "Play/Pause" habilitado e com ícone de Pause
-        window.setEnabledPlayPauseButton(true);
-        window.setPlayPauseButtonIcon(1);
-
-        // Habilita o botão Stop
-        window.setEnabledStopButton(true);
-
         currentSongIndex = songIndex;
 
         Song selected_song = songs[songIndex];
@@ -301,8 +307,18 @@ public class Player {
 
         currentFrame = 0;
 
-        // Mostra as informações da música
-        window.setPlayingSongInfo(songsInfo[songIndex][0], songsInfo[songIndex][1], songsInfo[songIndex][2]);
+        // Atualiza a GUI
+        EventQueue.invokeLater( () -> {
+            // Deixa o botão "Play/Pause" habilitado e com ícone de Pause
+            window.setEnabledPlayPauseButton(true);
+            window.setPlayPauseButtonIcon(1);
+
+            // Habilita o botão Stop
+            window.setEnabledStopButton(true);
+
+            // Mostra as informações da música
+            window.setPlayingSongInfo(songsInfo[songIndex][0], songsInfo[songIndex][1], songsInfo[songIndex][2]);
+        });
 
         // Inicia a thread
         playThread = new Thread(() -> {
@@ -315,7 +331,9 @@ public class Player {
                         int currentTime = (int) (songs[currentSongIndex].getMsPerFrame() * currentFrame);
 
                         // Contador de tempo
-                        window.setTime(currentTime, totalTime);
+                        EventQueue.invokeLater(() -> {
+                            window.setTime(currentTime, totalTime);
+                        });
 
                         bitstreamLock.lock();
 
@@ -378,5 +396,10 @@ public class Player {
         if (index < currentSongIndex) {
             currentSongIndex--;
         }
+
+        EventQueue.invokeLater( () -> {
+            // Atualiza a lista de reprodução
+            window.setQueueList(songsInfo);
+        });
     }
 }
