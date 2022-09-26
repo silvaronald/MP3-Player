@@ -14,6 +14,9 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.concurrent.locks.ReentrantLock;
+
+import static support.PlayerWindow.*;
 
 public class Player {
 
@@ -45,6 +48,9 @@ public class Player {
     
     private int currentFrame = 0;
 
+    // Lock utilizado para controlar os acessos às bitstreams
+    private ReentrantLock bitstreamLock = new ReentrantLock();
+
     // True quando a música está pausada
     private boolean paused = false;
 
@@ -53,23 +59,32 @@ public class Player {
 
     // Começa a reproduzir a música selecionada
     private final ActionListener buttonListenerPlayNow = e -> {
-        stopPlaying();
+        Thread playNowThread = new Thread(() -> {
+            stopPlaying();
 
-        startPlaying(getSelectedSongIndex());
+            startPlaying(getSelectedSongIndex());
+        });
+
+        playNowThread.start();
     };
 
     // Remove a música selecionada
     private final ActionListener buttonListenerRemove = e ->  {
-        int selectedSongIndex = getSelectedSongIndex();
+        Thread removeThread = new Thread( () -> {
+            int selectedSongIndex = getSelectedSongIndex();
 
-        // Se a música deletada for a que estiver tocando, a thread de reprodução deve ser parada
-        if (selectedSongIndex == currentSongIndex) {
-            stopPlaying();
+            // Se a música deletada for a que estiver tocando, a thread de reprodução deve ser parada
+            if (selectedSongIndex == currentSongIndex) {
+                deleteSong(selectedSongIndex);
 
-            currentSongIndex = -1;
-        }
+                stopPlaying();
+            }
+            else {
+                deleteSong(selectedSongIndex);
+            }
+        });
 
-        deleteSong(selectedSongIndex);
+        removeThread.start();
     };
 
     // Adiciona uma música ao final da lista de reprodução
@@ -128,7 +143,11 @@ public class Player {
 
     // Para a reprodução atual
     private final ActionListener buttonListenerStop = e -> {
-        stopPlaying();
+        Thread stopThread = new Thread( () -> {
+            stopPlaying();
+        });
+
+        stopThread.start();
     };
 
     private final ActionListener buttonListenerNext = e -> {
@@ -180,15 +199,22 @@ public class Player {
      */
     private boolean playNextFrame() throws JavaLayerException {
         // TODO Is this thread safe?
-        if (device != null) {
-            Header h = bitstream.readFrame();
-            if (h == null) return false;
+        bitstreamLock.lock();
 
-            SampleBuffer output = (SampleBuffer) decoder.decodeFrame(h, bitstream);
-            device.write(output.getBuffer(), 0, output.getBufferLength());
-            bitstream.closeFrame();
+        try {
+            if (device != null) {
+                Header h = bitstream.readFrame();
+                if (h == null) return false;
+
+                SampleBuffer output = (SampleBuffer) decoder.decodeFrame(h, bitstream);
+                device.write(output.getBuffer(), 0, output.getBufferLength());
+                bitstream.closeFrame();
+            }
+            return true;
         }
-        return true;
+        finally {
+            bitstreamLock.unlock();
+        }
     }
 
     /**
@@ -196,11 +222,18 @@ public class Player {
      */
     private boolean skipNextFrame() throws BitstreamException {
         // TODO Is this thread safe?
-        Header h = bitstream.readFrame();
-        if (h == null) return false;
-        bitstream.closeFrame();
-        currentFrame++;
-        return true;
+        bitstreamLock.lock();
+
+        try {
+            Header h = bitstream.readFrame();
+            if (h == null) return false;
+            bitstream.closeFrame();
+            currentFrame++;
+            return true;
+        }
+        finally {
+            bitstreamLock.unlock();
+        }
     }
 
     /**
@@ -211,27 +244,24 @@ public class Player {
      */
     private void skipToFrame(int newFrame) throws BitstreamException {
         // TODO Is this thread safe?
-        if (newFrame > currentFrame) {
-            int framesToSkip = newFrame - currentFrame;
-            boolean condition = true;
-            while (framesToSkip-- > 0 && condition) condition = skipNextFrame();
+        bitstreamLock.lock();
+
+        try {
+            if (newFrame > currentFrame) {
+                int framesToSkip = newFrame - currentFrame;
+                boolean condition = true;
+                while (framesToSkip-- > 0 && condition) condition = skipNextFrame();
+            }
+        }
+        finally {
+            bitstreamLock.unlock();
         }
     }
 
     // Função usada para interromper a reprodução das músicas
     private void stopPlaying() {
         // Interrompe a thread
-        playThread.stop();
-
-        // Deixa o botão "Play/Pause" desabilitado e com ícone de Play
-        window.setEnabledPlayPauseButton(false);
-        window.setPlayPauseButtonIcon(0);
-
-        // Desabilita o botão Stop
-        window.setEnabledStopButton(false);
-
-        // Deixa a aba de informações da música em branco
-        window.resetMiniPlayer();
+        playThread.interrupt();
 
         // Fecha o device e a bitstream
         if (bitstream != null){
@@ -242,17 +272,25 @@ public class Player {
                 bitstreamException.printStackTrace();
             }
         }
+
+        // Atualiza a GUI
+        EventQueue.invokeLater( () -> {
+            // Deixa o botão "Play/Pause" desabilitado e com ícone de Play
+            window.setEnabledPlayPauseButton(false);
+            window.setPlayPauseButtonIcon(0);
+
+            // Desabilita o botão Stop
+            window.setEnabledStopButton(false);
+
+            // Deixa a aba de informações da música em branco
+            window.resetMiniPlayer();
+        });
+
+        paused = false;
     }
 
     // Função usada para iniciar a reprodução das músicas
     private void startPlaying(int songIndex) {
-        // Deixa o botão "Play/Pause" habilitado e com ícone de Pause
-        window.setEnabledPlayPauseButton(true);
-        window.setPlayPauseButtonIcon(1);
-
-        // Habilita o botão Stop
-        window.setEnabledStopButton(true);
-
         currentSongIndex = songIndex;
 
         Song selected_song = songs[songIndex];
@@ -262,26 +300,58 @@ public class Player {
             device = FactoryRegistry.systemRegistry().createAudioDevice();
             device.open(this.decoder = new Decoder());
             bitstream = new Bitstream(selected_song.getBufferedInputStream());
-        } catch (JavaLayerException | FileNotFoundException ex) {
+        }
+        catch (JavaLayerException | FileNotFoundException ex) {
             throw new RuntimeException(ex);
         }
 
         currentFrame = 0;
 
-        // Mostra as informações da música
-        window.setPlayingSongInfo(songsInfo[songIndex][0], songsInfo[songIndex][1], songsInfo[songIndex][2]);
+        // Atualiza a GUI
+        EventQueue.invokeLater( () -> {
+            // Deixa o botão "Play/Pause" habilitado e com ícone de Pause
+            window.setEnabledPlayPauseButton(true);
+            window.setPlayPauseButtonIcon(1);
+
+            // Habilita o botão Stop
+            window.setEnabledStopButton(true);
+
+            // Mostra as informações da música
+            window.setPlayingSongInfo(songsInfo[songIndex][0], songsInfo[songIndex][1], songsInfo[songIndex][2]);
+        });
 
         // Inicia a thread
         playThread = new Thread(() -> {
+            // Tempo total da música
+            int totalTime = (int) songs[currentSongIndex].getMsLength();
             while (true) {
                 try {
                     if (!paused) {
-                        if (!playNextFrame()) {
-                            window.resetMiniPlayer();
-                            break;
+                        // Tempo atual da música
+                        int currentTime = (int) (songs[currentSongIndex].getMsPerFrame() * currentFrame);
+
+                        // Contador de tempo
+                        EventQueue.invokeLater(() -> {
+                            window.setTime(currentTime, totalTime);
+                        });
+
+                        bitstreamLock.lock();
+
+                        try {
+                            if (!playNextFrame()) {
+                                window.resetMiniPlayer();
+                                stopPlaying();
+                            }
                         }
+                        finally {
+                            bitstreamLock.unlock();
+                        }
+
+                        currentFrame++;
                     }
                 } catch (JavaLayerException ex) {
+                    stopPlaying();
+
                     throw new RuntimeException(ex);
                 }
             }
@@ -305,28 +375,31 @@ public class Player {
     // Deleta a música selecionada da lista de reprodução
     private void deleteSong(int index){
         // Faz cópias dos arrays songs e songsInfo deixando de fora o index a ser excluído
-        Song[] aux_song = new Song[songs.length-1];
+        Song[] auxSongs = new Song[songs.length-1];
 
-        String[][] aux_song_info = new String[songsInfo.length -1][];
+        String[][] auxSongsInfo = new String[songsInfo.length -1][];
 
         int counter = 0;
 
         for (int i = 0; i < songs.length; i++){
             if(i != index){
-                aux_song[counter] = songs[counter];
-                aux_song_info[counter] = songsInfo[counter];
+                auxSongs[counter] = songs[i];
+                auxSongsInfo[counter] = songsInfo[i];
                 counter ++;
             }
         }
 
-        songs = aux_song;
-        songsInfo = aux_song_info;
+        songs = auxSongs;
+        songsInfo = auxSongsInfo;
 
         // Atualiza o currentSongIndex
         if (index < currentSongIndex) {
             currentSongIndex--;
         }
 
-        window.setQueueList(songsInfo);
+        EventQueue.invokeLater( () -> {
+            // Atualiza a lista de reprodução
+            window.setQueueList(songsInfo);
+        });
     }
 }
