@@ -151,10 +151,22 @@ public class Player {
     };
 
     private final ActionListener buttonListenerNext = e -> {
-        // TODO
+        Thread nextThread = new Thread(() -> {
+            stopPlaying();
+
+            startPlaying(currentSongIndex + 1);
+        });
+
+        nextThread.start();
     };
     private final ActionListener buttonListenerPrevious = e -> {
-        // TODO
+        Thread previousThread = new Thread(() -> {
+            stopPlaying();
+
+            startPlaying(currentSongIndex - 1);
+        });
+
+        previousThread.start();
     };
     private final ActionListener buttonListenerShuffle = e -> {
         // TODO
@@ -264,7 +276,7 @@ public class Player {
         playThread.interrupt();
 
         // Fecha o device e a bitstream
-        if (bitstream != null){
+        if (bitstream != null) {
             try {
                 bitstream.close();
                 device.close();
@@ -309,6 +321,24 @@ public class Player {
 
         // Atualiza a GUI
         EventQueue.invokeLater( () -> {
+            // Atualiza os botões Previous & Next
+            if (songs.length == 1) {
+                window.setEnabledPreviousButton(false);
+                window.setEnabledNextButton(false);
+            }
+            else if (currentSongIndex == 0) {
+                window.setEnabledPreviousButton(false);
+                window.setEnabledNextButton(true);
+            }
+            else if (currentSongIndex == songs.length - 1) {
+                window.setEnabledPreviousButton(true);
+                window.setEnabledNextButton(false);
+            }
+            else {
+                window.setEnabledPreviousButton(true);
+                window.setEnabledNextButton(true);
+            }
+
             // Deixa o botão "Play/Pause" habilitado e com ícone de Pause
             window.setEnabledPlayPauseButton(true);
             window.setPlayPauseButtonIcon(1);
@@ -335,23 +365,26 @@ public class Player {
                             window.setTime(currentTime, totalTime);
                         });
 
-                        bitstreamLock.lock();
+                        if (!playNextFrame()) {
+                            // Toca a próxima música em sequência (se houver)
+                            if (currentSongIndex < songs.length - 1) {
+                                Thread playNextThread = new Thread(() -> {
+                                    stopPlaying();
 
-                        try {
-                            if (!playNextFrame()) {
-                                window.resetMiniPlayer();
+                                    startPlaying(currentSongIndex + 1);
+                                });
+
+                                playNextThread.start();
+                            }
+                            else {
                                 stopPlaying();
                             }
-                        }
-                        finally {
-                            bitstreamLock.unlock();
                         }
 
                         currentFrame++;
                     }
-                } catch (JavaLayerException ex) {
-                    stopPlaying();
-
+                }
+                catch (JavaLayerException ex) {
                     throw new RuntimeException(ex);
                 }
             }
