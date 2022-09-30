@@ -359,7 +359,6 @@ public class Player {
             // Tempo total da música
             int totalTime = (int) songs[currentSongIndex].getMsLength();
             while (true) {
-                bitstreamLock.lock();
                 try {
                     if (!paused) {
                         // Tempo atual da música
@@ -372,28 +371,27 @@ public class Player {
 
                         if (!playNextFrame()) {
                             // Toca a próxima música em sequência (se houver)
-                            if (currentSongIndex < songs.length - 1) {
-                                Thread playNextThread = new Thread(() -> {
+                            Thread playNextThread = new Thread(() -> {
+                                if (currentSongIndex < songs.length - 1) {
                                     stopPlaying();
-
                                     startPlaying(currentSongIndex + 1);
-                                });
 
-                                playNextThread.start();
-                            }
-                            else {
-                                stopPlaying();
-                            }
+                                } else {
+                                    stopPlaying();
+                                }
+                            });
+
+                            playNextThread.start();
+
+                            playNextThread.join();
                         }
-
-                        currentFrame++;
+                        else{
+                            currentFrame++;
+                        }
                     }
                 }
-                catch (JavaLayerException ex) {
+                catch (JavaLayerException | InterruptedException ex) {
                     throw new RuntimeException(ex);
-                }
-                finally {
-                    bitstreamLock.unlock();
                 }
             }
         });
