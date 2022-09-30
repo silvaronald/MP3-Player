@@ -117,6 +117,10 @@ public class Player {
             // Atualiza a lista de reprodução
             window.setQueueList(songsInfo);
 
+            if (currentSongIndex == songs.length - 2){
+                window.setEnabledNextButton(true);
+            }
+
         } catch (IOException | InvalidDataException | BitstreamException | UnsupportedTagException ex) {
             throw new RuntimeException(ex);
         }
@@ -355,6 +359,7 @@ public class Player {
             // Tempo total da música
             int totalTime = (int) songs[currentSongIndex].getMsLength();
             while (true) {
+                bitstreamLock.lock();
                 try {
                     if (!paused) {
                         // Tempo atual da música
@@ -386,6 +391,9 @@ public class Player {
                 }
                 catch (JavaLayerException ex) {
                     throw new RuntimeException(ex);
+                }
+                finally {
+                    bitstreamLock.unlock();
                 }
             }
         });
