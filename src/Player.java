@@ -166,10 +166,13 @@ public class Player {
     private final MouseInputAdapter scrubberMouseInputAdapter = new MouseInputAdapter() {
         private int songLength;
         private int scrubberTargetPoint;
+        private int scrubberCurrentPoint;
+
+        private boolean dragging;
 
         void updateScrubber () {
             // Atualiza o frame atual a depender de onde o scrubber parou
-            int scrubberCurrentPoint = window.getScrubberValue();
+            scrubberCurrentPoint = window.getScrubberValue();
 
             // É preciso criar uma nova bistream para voltar a um momento anterior da música
             if (scrubberCurrentPoint >= scrubberTargetPoint) {
@@ -217,17 +220,14 @@ public class Player {
         }
         @Override
         public void mouseReleased(MouseEvent e) {
+            dragging = false;
+
+            // Atualiza o scrubber
             Thread mouseReleasedThread = new Thread(() -> {
                 updateScrubber();
             });
 
             mouseReleasedThread.start();
-
-            try {
-                mouseReleasedThread.join();
-            } catch (InterruptedException ex) {
-                throw new RuntimeException(ex);
-            }
         }
 
         @Override
@@ -240,6 +240,23 @@ public class Player {
 
         @Override
         public void mouseDragged(MouseEvent e) {
+            // Fica atualizando repetidamente o scrubber
+            dragging = true;
+
+            Thread mouseDraggedThread = new Thread (() -> {
+                updateScrubber();
+
+                scrubberCurrentPoint = scrubberTargetPoint;
+                scrubberTargetPoint = window.getScrubberValue();
+            });
+
+            mouseDraggedThread.start();
+
+            try {
+                mouseDraggedThread.join();
+            } catch (InterruptedException ex) {
+                throw new RuntimeException(ex);
+            }
         }
     };
 
