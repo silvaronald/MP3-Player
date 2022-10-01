@@ -49,9 +49,6 @@ public class Player {
     // Lock utilizado para controlar os acessos às bitstreams
     private ReentrantLock bitstreamLock = new ReentrantLock();
 
-    // Lock utilizado para controlar os acessos ao frame atual
-    private ReentrantLock frameLock = new ReentrantLock();
-
     // True quando a música está pausada
     private boolean paused = false;
 
@@ -168,8 +165,6 @@ public class Player {
         private int scrubberTargetPoint;
         private int scrubberCurrentPoint;
 
-        private boolean dragging;
-
         void updateScrubber () {
             // Atualiza o frame atual a depender de onde o scrubber parou
             scrubberCurrentPoint = window.getScrubberValue();
@@ -220,8 +215,6 @@ public class Player {
         }
         @Override
         public void mouseReleased(MouseEvent e) {
-            dragging = false;
-
             // Atualiza o scrubber
             Thread mouseReleasedThread = new Thread(() -> {
                 updateScrubber();
@@ -241,8 +234,6 @@ public class Player {
         @Override
         public void mouseDragged(MouseEvent e) {
             // Fica atualizando repetidamente o scrubber
-            dragging = true;
-
             Thread mouseDraggedThread = new Thread (() -> {
                 updateScrubber();
 
