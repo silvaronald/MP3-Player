@@ -16,8 +16,6 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static support.PlayerWindow.*;
-
 public class Player {
 
     /**
@@ -50,6 +48,9 @@ public class Player {
 
     // Lock utilizado para controlar os acessos às bitstreams
     private ReentrantLock bitstreamLock = new ReentrantLock();
+
+    // Lock utilizado para controlar os acessos ao frame atual
+    private ReentrantLock frameLock = new ReentrantLock();
 
     // True quando a música está pausada
     private boolean paused = false;
@@ -163,12 +164,78 @@ public class Player {
         // TODO
     };
     private final MouseInputAdapter scrubberMouseInputAdapter = new MouseInputAdapter() {
+        private int songLength;
+        private int scrubberTargetPoint;
+
+        void updateScrubber () {
+            // Atualiza o frame atual a depender de onde o scrubber parou
+            int scrubberCurrentPoint = window.getScrubberValue();
+
+            // É preciso criar uma nova bistream para voltar a um momento anterior da música
+            if (scrubberCurrentPoint >= scrubberTargetPoint) {
+                bitstreamLock.lock();
+
+                try {
+                    // Fecha o device e a bitstream
+                    if (bitstream != null) {
+                        try {
+                            bitstream.close();
+                            device.close();
+                        } catch (BitstreamException bitstreamException) {
+                            bitstreamException.printStackTrace();
+                        }
+                    }
+
+                    // Cria a bitstream e o device
+                    try {
+                        device = FactoryRegistry.systemRegistry().createAudioDevice();
+                        device.open(decoder = new Decoder());
+                        bitstream = new Bitstream(songs[currentSongIndex].getBufferedInputStream());
+                    } catch (JavaLayerException | FileNotFoundException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+                finally {
+                    bitstreamLock.unlock();
+                }
+
+                currentFrame = 0;
+            }
+
+            // Pula para o momento selecionado
+            int newCurrentFrame = (int) (scrubberTargetPoint / songs[currentSongIndex].getMsPerFrame());
+
+            try {
+                skipToFrame(newCurrentFrame);
+            } catch (BitstreamException ex) {
+                throw new RuntimeException(ex);
+            }
+
+            EventQueue.invokeLater(() -> {
+                window.setTime(scrubberTargetPoint, songLength);
+            });
+        }
         @Override
         public void mouseReleased(MouseEvent e) {
+            Thread mouseReleasedThread = new Thread(() -> {
+                updateScrubber();
+            });
+
+            mouseReleasedThread.start();
+
+            try {
+                mouseReleasedThread.join();
+            } catch (InterruptedException ex) {
+                throw new RuntimeException(ex);
+            }
         }
 
         @Override
         public void mousePressed(MouseEvent e) {
+            // Guarda o valor onde o scrubber começou
+            scrubberTargetPoint = window.getScrubberValue();
+
+            songLength = (int) songs[currentSongIndex].getMsLength();
         }
 
         @Override
@@ -298,7 +365,7 @@ public class Player {
         // Cria a bitstream e o device
         try {
             device = FactoryRegistry.systemRegistry().createAudioDevice();
-            device.open(this.decoder = new Decoder());
+            device.open(decoder = new Decoder());
             bitstream = new Bitstream(selected_song.getBufferedInputStream());
         }
         catch (JavaLayerException | FileNotFoundException ex) {
@@ -315,6 +382,9 @@ public class Player {
 
             // Habilita o botão Stop
             window.setEnabledStopButton(true);
+
+            // Habilita o scrubber
+            window.setEnabledScrubber(true);
 
             // Mostra as informações da música
             window.setPlayingSongInfo(songsInfo[songIndex][0], songsInfo[songIndex][1], songsInfo[songIndex][2]);
@@ -335,23 +405,14 @@ public class Player {
                             window.setTime(currentTime, totalTime);
                         });
 
-                        bitstreamLock.lock();
-
-                        try {
-                            if (!playNextFrame()) {
-                                window.resetMiniPlayer();
-                                stopPlaying();
-                            }
-                        }
-                        finally {
-                            bitstreamLock.unlock();
+                        if (!playNextFrame()) {
+                            window.resetMiniPlayer();
+                            stopPlaying();
                         }
 
                         currentFrame++;
                     }
                 } catch (JavaLayerException ex) {
-                    stopPlaying();
-
                     throw new RuntimeException(ex);
                 }
             }
