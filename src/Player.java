@@ -52,6 +52,9 @@ public class Player {
     // True quando a música está pausada
     private boolean paused = false;
 
+    // True quando o scrubber está sendo arrastado
+    private boolean scrubberDragging = false;
+
     // Thread usada para reproduzir músicas
     private Thread playThread = new Thread();
 
@@ -163,11 +166,12 @@ public class Player {
     private final MouseInputAdapter scrubberMouseInputAdapter = new MouseInputAdapter() {
         private int songLength;
         private int scrubberTargetPoint;
-        private int scrubberCurrentPoint;
 
         void updateScrubber () {
+            scrubberDragging = false;
+
             // Atualiza o frame atual a depender de onde o scrubber parou
-            scrubberCurrentPoint = window.getScrubberValue();
+            int scrubberCurrentPoint = window.getScrubberValue();
 
             // É preciso criar uma nova bistream para voltar a um momento anterior da música
             if (scrubberCurrentPoint >= scrubberTargetPoint) {
@@ -215,7 +219,7 @@ public class Player {
         }
         @Override
         public void mouseReleased(MouseEvent e) {
-            // Atualiza o scrubber
+            // Atualiza a música para o momento selecionado
             Thread mouseReleasedThread = new Thread(() -> {
                 updateScrubber();
             });
@@ -233,21 +237,12 @@ public class Player {
 
         @Override
         public void mouseDragged(MouseEvent e) {
-            // Fica atualizando repetidamente o scrubber
-            Thread mouseDraggedThread = new Thread (() -> {
-                updateScrubber();
+            // Toma nota repetidamente sobre onde o scrubber está e atualiza o mostrador de tempo
+            scrubberDragging = true;
 
-                scrubberCurrentPoint = scrubberTargetPoint;
-                scrubberTargetPoint = window.getScrubberValue();
-            });
+            scrubberTargetPoint = window.getScrubberValue();
 
-            mouseDraggedThread.start();
-
-            try {
-                mouseDraggedThread.join();
-            } catch (InterruptedException ex) {
-                throw new RuntimeException(ex);
-            }
+            window.setTime(scrubberTargetPoint, songLength);
         }
     };
 
@@ -409,9 +404,11 @@ public class Player {
                         int currentTime = (int) (songs[currentSongIndex].getMsPerFrame() * currentFrame);
 
                         // Contador de tempo
-                        EventQueue.invokeLater(() -> {
-                            window.setTime(currentTime, totalTime);
-                        });
+                        if (!scrubberDragging) {
+                            EventQueue.invokeLater(() -> {
+                                window.setTime(currentTime, totalTime);
+                            });
+                        }
 
                         if (!playNextFrame()) {
                             window.resetMiniPlayer();
