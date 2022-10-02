@@ -16,8 +16,6 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static support.PlayerWindow.*;
-
 public class Player {
 
     /**
@@ -53,6 +51,9 @@ public class Player {
 
     // True quando a música está pausada
     private boolean paused = false;
+
+    // True quando o scrubber está sendo arrastado
+    private boolean scrubberDragging = false;
 
     // Thread usada para reproduzir músicas
     private Thread playThread = new Thread();
@@ -179,16 +180,85 @@ public class Player {
         // TODO
     };
     private final MouseInputAdapter scrubberMouseInputAdapter = new MouseInputAdapter() {
+        private int songLength;
+        private int scrubberTargetPoint;
+
+        void updateScrubber () {
+            scrubberDragging = false;
+
+            // Atualiza o frame atual a depender de onde o scrubber parou
+            int scrubberCurrentPoint = window.getScrubberValue();
+
+            // É preciso criar uma nova bistream para voltar a um momento anterior da música
+            if (scrubberCurrentPoint >= scrubberTargetPoint) {
+                bitstreamLock.lock();
+
+                try {
+                    // Fecha o device e a bitstream
+                    if (bitstream != null) {
+                        try {
+                            bitstream.close();
+                            device.close();
+                        } catch (BitstreamException bitstreamException) {
+                            bitstreamException.printStackTrace();
+                        }
+                    }
+
+                    // Cria a bitstream e o device
+                    try {
+                        device = FactoryRegistry.systemRegistry().createAudioDevice();
+                        device.open(decoder = new Decoder());
+                        bitstream = new Bitstream(songs[currentSongIndex].getBufferedInputStream());
+                    } catch (JavaLayerException | FileNotFoundException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+                finally {
+                    bitstreamLock.unlock();
+                }
+
+                currentFrame = 0;
+            }
+
+            // Pula para o momento selecionado
+            int newCurrentFrame = (int) (scrubberTargetPoint / songs[currentSongIndex].getMsPerFrame());
+
+            try {
+                skipToFrame(newCurrentFrame);
+            } catch (BitstreamException ex) {
+                throw new RuntimeException(ex);
+            }
+
+            EventQueue.invokeLater(() -> {
+                window.setTime(scrubberTargetPoint, songLength);
+            });
+        }
         @Override
         public void mouseReleased(MouseEvent e) {
+            // Atualiza a música para o momento selecionado
+            Thread mouseReleasedThread = new Thread(() -> {
+                updateScrubber();
+            });
+
+            mouseReleasedThread.start();
         }
 
         @Override
         public void mousePressed(MouseEvent e) {
+            // Guarda o valor onde o scrubber começou
+            scrubberTargetPoint = window.getScrubberValue();
+
+            songLength = (int) songs[currentSongIndex].getMsLength();
         }
 
         @Override
         public void mouseDragged(MouseEvent e) {
+            // Toma nota repetidamente sobre onde o scrubber está e atualiza o mostrador de tempo
+            scrubberDragging = true;
+
+            scrubberTargetPoint = window.getScrubberValue();
+
+            window.setTime(scrubberTargetPoint, songLength);
         }
     };
 
@@ -314,7 +384,7 @@ public class Player {
         // Cria a bitstream e o device
         try {
             device = FactoryRegistry.systemRegistry().createAudioDevice();
-            device.open(this.decoder = new Decoder());
+            device.open(decoder = new Decoder());
             bitstream = new Bitstream(selected_song.getBufferedInputStream());
         }
         catch (JavaLayerException | FileNotFoundException ex) {
@@ -350,6 +420,9 @@ public class Player {
             // Habilita o botão Stop
             window.setEnabledStopButton(true);
 
+            // Habilita o scrubber
+            window.setEnabledScrubber(true);
+
             // Mostra as informações da música
             window.setPlayingSongInfo(songsInfo[songIndex][0], songsInfo[songIndex][1], songsInfo[songIndex][2]);
         });
@@ -365,9 +438,11 @@ public class Player {
                         int currentTime = (int) (songs[currentSongIndex].getMsPerFrame() * currentFrame);
 
                         // Contador de tempo
-                        EventQueue.invokeLater(() -> {
-                            window.setTime(currentTime, totalTime);
-                        });
+                        if (!scrubberDragging) {
+                            EventQueue.invokeLater(() -> {
+                                window.setTime(currentTime, totalTime);
+                            });
+                        }
 
                         if (!playNextFrame()) {
                             // Toca a próxima música em sequência (se houver)
