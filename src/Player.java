@@ -117,6 +117,10 @@ public class Player {
             // Atualiza a lista de reprodução
             window.setQueueList(songsInfo);
 
+            if (currentSongIndex == songs.length - 2){
+                window.setEnabledNextButton(true);
+            }
+
         } catch (IOException | InvalidDataException | BitstreamException | UnsupportedTagException ex) {
             throw new RuntimeException(ex);
         }
@@ -151,10 +155,22 @@ public class Player {
     };
 
     private final ActionListener buttonListenerNext = e -> {
-        // TODO
+        Thread nextThread = new Thread(() -> {
+            stopPlaying();
+
+            startPlaying(currentSongIndex + 1);
+        });
+
+        nextThread.start();
     };
     private final ActionListener buttonListenerPrevious = e -> {
-        // TODO
+        Thread previousThread = new Thread(() -> {
+            stopPlaying();
+
+            startPlaying(currentSongIndex - 1);
+        });
+
+        previousThread.start();
     };
     private final ActionListener buttonListenerShuffle = e -> {
         // TODO
@@ -264,7 +280,7 @@ public class Player {
         playThread.interrupt();
 
         // Fecha o device e a bitstream
-        if (bitstream != null){
+        if (bitstream != null) {
             try {
                 bitstream.close();
                 device.close();
@@ -309,6 +325,24 @@ public class Player {
 
         // Atualiza a GUI
         EventQueue.invokeLater( () -> {
+            // Atualiza os botões Previous & Next
+            if (songs.length == 1) {
+                window.setEnabledPreviousButton(false);
+                window.setEnabledNextButton(false);
+            }
+            else if (currentSongIndex == 0) {
+                window.setEnabledPreviousButton(false);
+                window.setEnabledNextButton(true);
+            }
+            else if (currentSongIndex == songs.length - 1) {
+                window.setEnabledPreviousButton(true);
+                window.setEnabledNextButton(false);
+            }
+            else {
+                window.setEnabledPreviousButton(true);
+                window.setEnabledNextButton(true);
+            }
+
             // Deixa o botão "Play/Pause" habilitado e com ícone de Pause
             window.setEnabledPlayPauseButton(true);
             window.setPlayPauseButtonIcon(1);
@@ -335,23 +369,28 @@ public class Player {
                             window.setTime(currentTime, totalTime);
                         });
 
-                        bitstreamLock.lock();
+                        if (!playNextFrame()) {
+                            // Toca a próxima música em sequência (se houver)
+                            Thread playNextThread = new Thread(() -> {
+                                if (currentSongIndex < songs.length - 1) {
+                                    stopPlaying();
+                                    startPlaying(currentSongIndex + 1);
 
-                        try {
-                            if (!playNextFrame()) {
-                                window.resetMiniPlayer();
-                                stopPlaying();
-                            }
-                        }
-                        finally {
-                            bitstreamLock.unlock();
-                        }
+                                } else {
+                                    stopPlaying();
+                                }
+                            });
 
-                        currentFrame++;
+                            playNextThread.start();
+
+                            playNextThread.join();
+                        }
+                        else{
+                            currentFrame++;
+                        }
                     }
-                } catch (JavaLayerException ex) {
-                    stopPlaying();
-
+                }
+                catch (JavaLayerException | InterruptedException ex) {
                     throw new RuntimeException(ex);
                 }
             }
