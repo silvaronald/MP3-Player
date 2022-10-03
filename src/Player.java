@@ -187,7 +187,11 @@ public class Player {
         private int songLength;
         private int scrubberTargetPoint;
 
+        private boolean pausedPreviousState;
+
         void updateScrubber () {
+            paused = true;
+
             scrubberDragging = false;
 
             // Atualiza o frame atual a depender de onde o scrubber parou
@@ -236,6 +240,8 @@ public class Player {
             EventQueue.invokeLater(() -> {
                 window.setTime(scrubberTargetPoint, songLength);
             });
+
+            paused = pausedPreviousState;
         }
         @Override
         public void mouseReleased(MouseEvent e) {
@@ -250,18 +256,20 @@ public class Player {
         @Override
         public void mousePressed(MouseEvent e) {
             // Guarda o valor onde o scrubber começou
+            pausedPreviousState = paused;
+
+            paused = true;
+
             scrubberTargetPoint = window.getScrubberValue();
 
             songLength = (int) songs[currentSongIndex].getMsLength();
         }
 
         @Override
-        public void mouseDragged(MouseEvent e) {scrubberDragging = true;
-
-            scrubberTargetPoint = window.getScrubberValue();
-
-            window.setTime(scrubberTargetPoint, songLength);
+        public void mouseDragged(MouseEvent e) {
             // Toma nota repetidamente sobre onde o scrubber está e atualiza o mostrador de tempo
+            paused = pausedPreviousState;
+
             scrubberDragging = true;
 
             scrubberTargetPoint = window.getScrubberValue();
