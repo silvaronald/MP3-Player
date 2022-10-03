@@ -79,6 +79,10 @@ public class Player {
                 deleteSong(selectedSongIndex);
 
                 stopPlaying();
+
+                if (songs.length >= selectedSongIndex + 1) {
+                    startPlaying(selectedSongIndex);
+                }
             }
             else {
                 deleteSong(selectedSongIndex);
@@ -252,7 +256,11 @@ public class Player {
         }
 
         @Override
-        public void mouseDragged(MouseEvent e) {
+        public void mouseDragged(MouseEvent e) {scrubberDragging = true;
+
+            scrubberTargetPoint = window.getScrubberValue();
+
+            window.setTime(scrubberTargetPoint, songLength);
             // Toma nota repetidamente sobre onde o scrubber está e atualiza o mostrador de tempo
             scrubberDragging = true;
 
