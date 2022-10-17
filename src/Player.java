@@ -49,8 +49,14 @@ public class Player {
     // Lock utilizado para controlar os acessos às bitstreams
     private ReentrantLock bitstreamLock = new ReentrantLock();
 
+    // True quando alguma música está tocando
+    private boolean playing = false;
+
     // True quando a música está pausada
     private boolean paused = false;
+
+    // True quando o shuffle está ativado
+    private boolean shuffle = false;
 
     // True quando o scrubber está sendo arrastado
     private boolean scrubberDragging = false;
@@ -87,6 +93,18 @@ public class Player {
             else {
                 deleteSong(selectedSongIndex);
             }
+
+            if (songs.length < 2) {
+                EventQueue.invokeLater(() -> {
+                    window.setEnabledShuffleButton(false);
+                });
+            }
+
+            if (playing) {
+                EventQueue.invokeLater(() -> {
+                    updatePreviousAndNextButtons();
+                });
+            }
         });
 
         removeThread.start();
@@ -122,12 +140,16 @@ public class Player {
             // Atualiza a lista de reprodução
             window.setQueueList(songsInfo);
 
-            if (currentSongIndex == songs.length - 2){
+            if (currentSongIndex == songs.length - 2 && playing){
                 window.setEnabledNextButton(true);
             }
 
         } catch (IOException | InvalidDataException | BitstreamException | UnsupportedTagException ex) {
             throw new RuntimeException(ex);
+        }
+
+        if (songs.length > 1){
+            window.setEnabledShuffleButton(true);
         }
     };
 
@@ -389,10 +411,13 @@ public class Player {
         });
 
         paused = false;
+        playing = false;
     }
 
     // Função usada para iniciar a reprodução das músicas
     private void startPlaying(int songIndex) {
+        playing = true;
+
         currentSongIndex = songIndex;
 
         Song selected_song = songs[songIndex];
@@ -412,22 +437,7 @@ public class Player {
         // Atualiza a GUI
         EventQueue.invokeLater( () -> {
             // Atualiza os botões Previous & Next
-            if (songs.length == 1) {
-                window.setEnabledPreviousButton(false);
-                window.setEnabledNextButton(false);
-            }
-            else if (currentSongIndex == 0) {
-                window.setEnabledPreviousButton(false);
-                window.setEnabledNextButton(true);
-            }
-            else if (currentSongIndex == songs.length - 1) {
-                window.setEnabledPreviousButton(true);
-                window.setEnabledNextButton(false);
-            }
-            else {
-                window.setEnabledPreviousButton(true);
-                window.setEnabledNextButton(true);
-            }
+            updatePreviousAndNextButtons();
 
             // Deixa o botão "Play/Pause" habilitado e com ícone de Pause
             window.setEnabledPlayPauseButton(true);
@@ -531,5 +541,25 @@ public class Player {
             // Atualiza a lista de reprodução
             window.setQueueList(songsInfo);
         });
+    }
+
+    private void updatePreviousAndNextButtons () {
+        // Atualiza os botões Previous & Next
+        if (songs.length == 1) {
+            window.setEnabledPreviousButton(false);
+            window.setEnabledNextButton(false);
+        }
+        else if (currentSongIndex == 0) {
+            window.setEnabledPreviousButton(false);
+            window.setEnabledNextButton(true);
+        }
+        else if (currentSongIndex == songs.length - 1) {
+            window.setEnabledPreviousButton(true);
+            window.setEnabledNextButton(false);
+        }
+        else {
+            window.setEnabledPreviousButton(true);
+            window.setEnabledNextButton(true);
+        }
     }
 }
