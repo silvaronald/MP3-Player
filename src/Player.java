@@ -14,6 +14,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.Random;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Player {
@@ -37,9 +38,13 @@ public class Player {
 
     // Guarda as músicas da lista de reprodução
     private Song[] songs;
+    private Song[] shuffledSongs;
+    private Song[] regularSongs;
 
     // Guarda as informações das músicas da lista de reprodução
     private String[][] songsInfo;
+    private String[][] shuffledSongsInfo;
+    private String[][] regularSongsInfo;
 
     // Guarda o index da música que está sendo reproduzida
     private int currentSongIndex;
@@ -94,12 +99,14 @@ public class Player {
                 deleteSong(selectedSongIndex);
             }
 
+            // Atualiza o botão shuffle se necessário
             if (songs.length < 2) {
                 EventQueue.invokeLater(() -> {
                     window.setEnabledShuffleButton(false);
                 });
             }
 
+            // Atualiza os botões Previous e Next se necessário
             if (playing) {
                 EventQueue.invokeLater(() -> {
                     updatePreviousAndNextButtons();
@@ -110,7 +117,7 @@ public class Player {
         removeThread.start();
     };
 
-    // Adiciona uma música ao final da lista de reprodução
+    // Adiciona uma música na lista de reprodução
     private final ActionListener buttonListenerAddSong = e -> {
         try {
             Song addedSong = window.openFileChooser();
@@ -148,6 +155,7 @@ public class Player {
             throw new RuntimeException(ex);
         }
 
+        // Atualiza o botão Shuffle se necessário
         if (songs.length > 1){
             window.setEnabledShuffleButton(true);
         }
@@ -200,7 +208,65 @@ public class Player {
         previousThread.start();
     };
     private final ActionListener buttonListenerShuffle = e -> {
-        // TODO
+        Thread shuffleThread = new Thread(() -> {
+            String currentSongId = songsInfo[currentSongIndex][4];
+
+            if (!shuffle) {
+                shuffle = true;
+
+                // Guarda a lista de reprodução atual
+                regularSongs = Arrays.copyOf(songs, songs.length);
+                regularSongsInfo = Arrays.copyOf(songsInfo, songsInfo.length);
+
+                shuffleSongs();
+
+                if (playing) {
+                    // Se houver uma música sendo tocada, ela deve ficar no topo da lista
+                    for (int i = 0; i < songsInfo.length; i++) {
+                        if (currentSongId == songsInfo[i][4]) {
+                            String[] temp = songsInfo[0];
+
+                            songsInfo[0] = songsInfo[i];
+
+                            songsInfo[i] = temp;
+
+                            break;
+                        }
+                    }
+
+                    currentSongIndex = 0;
+                }
+            }
+
+            else if (shuffle) {
+                shuffle = false;
+
+                // Volta a lista de reprodução para o estado anterior
+                songs = Arrays.copyOf(regularSongs, regularSongs.length);
+                songsInfo = Arrays.copyOf(regularSongsInfo, regularSongsInfo.length);
+
+                // Atualiza o currentSongIndex
+                if (playing) {
+                    for (int i = 0; i < songsInfo.length; i++) {
+                        if (currentSongId == songsInfo[i][4]) {
+                            currentSongIndex = i;
+
+                            break;
+                        }
+                    }
+                }
+
+                System.out.println(currentSongIndex);
+            }
+
+            // Atualiza a interface
+            EventQueue.invokeLater(() -> {
+                window.setQueueList(songsInfo);
+                updatePreviousAndNextButtons();
+            });
+        });
+
+        shuffleThread.start();
     };
     private final ActionListener buttonListenerLoop = e -> {
         // TODO
@@ -560,6 +626,31 @@ public class Player {
         else {
             window.setEnabledPreviousButton(true);
             window.setEnabledNextButton(true);
+        }
+    }
+
+    // Função para embaralhar a lista de reprodução
+    private void shuffleSongs()
+    {
+        int index;
+
+        Song tempSong;
+
+        String[] tempInfo;
+
+        Random random = new Random();
+
+        for (int i = songs.length - 1; i > 0; i--)
+        {
+            index = random.nextInt(i + 1);
+
+            tempSong = songs[index];
+            songs[index] = songs[i];
+            songs[i] = tempSong;
+
+            tempInfo = songsInfo[index];
+            songsInfo[index] = songsInfo[i];
+            songsInfo[i] = tempInfo;
         }
     }
 }
