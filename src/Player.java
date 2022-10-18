@@ -128,6 +128,11 @@ public class Player {
             if (songs != null) {
                 songs = Arrays.copyOf(songs, songs.length + 1);
                 songs[songs.length -1] = addedSong;
+
+                if (shuffle){ // Atualiza a cópia antes do shuffle se uma música foi adicionada enquanto
+                    // o botão de shuffle estava ativo
+                    regularSongs = Arrays.copyOf(songs, songs.length);
+                }
             }
 
             else {
@@ -138,6 +143,11 @@ public class Player {
             if (songsInfo != null){
                 songsInfo = Arrays.copyOf(songsInfo, songsInfo.length + 1);
                 songsInfo[songsInfo.length -1] = addedSongInfo;
+
+                if (shuffle){// Atualiza a cópia antes do shuffle se uma música foi adicionada enquanto
+                    // o botão de shuffle estava ativo
+                    regularSongsInfo = Arrays.copyOf(songsInfo, songsInfo.length);
+                }
             }
 
             else {
@@ -223,7 +233,7 @@ public class Player {
                 if (playing) {
                     // Se houver uma música sendo tocada, ela deve ficar no topo da lista
                     for (int i = 0; i < songsInfo.length; i++) {
-                        if (currentSongId == songsInfo[i][4]) {
+                        if (currentSongId == songsInfo[i][5]) {
                             String[] temp = songsInfo[0];
 
                             songsInfo[0] = songsInfo[i];
@@ -248,7 +258,7 @@ public class Player {
                 // Atualiza o currentSongIndex
                 if (playing) {
                     for (int i = 0; i < songsInfo.length; i++) {
-                        if (currentSongId == songsInfo[i][4]) {
+                        if (currentSongId == songsInfo[i][5]) {
                             currentSongIndex = i;
 
                             break;
@@ -580,12 +590,14 @@ public class Player {
 
     // Deleta a música selecionada da lista de reprodução
     private void deleteSong(int index){
+
         // Faz cópias dos arrays songs e songsInfo deixando de fora o index a ser excluído
         Song[] auxSongs = new Song[songs.length-1];
 
         String[][] auxSongsInfo = new String[songsInfo.length -1][];
 
         int counter = 0;
+        String id = songsInfo[index][5];
 
         for (int i = 0; i < songs.length; i++){
             if(i != index){
@@ -595,8 +607,27 @@ public class Player {
             }
         }
 
-        songs = auxSongs;
+        songs = auxSongs; // else not shuffle
         songsInfo = auxSongsInfo;
+
+        if (shuffle){ // Precisamos remover também quando o shuffle está ativo
+            auxSongs = new Song[regularSongs.length - 1];
+            auxSongsInfo = new String[regularSongsInfo.length - 1][];
+
+            counter = 0;
+
+
+            for (int i = 0; i < regularSongsInfo.length; i++){
+                if(!regularSongsInfo[i][5].equals(id)){
+                    auxSongs[counter] = regularSongs[i];
+                    auxSongsInfo[counter] = regularSongsInfo[i];
+                    counter ++;
+                }
+            }
+            regularSongs = auxSongs;
+            regularSongsInfo = auxSongsInfo;
+
+        }
 
         // Atualiza o currentSongIndex
         if (index < currentSongIndex) {
