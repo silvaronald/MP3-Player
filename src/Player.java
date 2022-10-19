@@ -36,12 +36,14 @@ public class Player {
 
     private String windowTitle = "Deezer Inc.";
 
-    // Guarda as músicas da lista de reprodução
+    // Guarda as músicas e suas informações da lista de reprodução
     private Song[] songs;
+
+    private String[][] songsInfo;
+
+    // Guarda as músicas e as informações da lista antes do shuffle
     private Song[] regularSongs;
 
-    // Guarda as informações das músicas da lista de reprodução
-    private String[][] songsInfo;
     private String[][] regularSongsInfo;
 
     // Guarda o index da música que está sendo reproduzida
@@ -60,6 +62,9 @@ public class Player {
 
     // True quando o shuffle está ativado
     private boolean shuffle = false;
+
+    // True quando o loop está ativado
+    private boolean loop = false;
 
     // True quando o scrubber está sendo arrastado
     private boolean scrubberDragging = false;
@@ -83,15 +88,17 @@ public class Player {
         Thread removeThread = new Thread( () -> {
             int selectedSongIndex = getSelectedSongIndex();
 
-            // Se a música deletada for a que estiver tocando, a thread de reprodução deve ser parada
+            // Se a música deletada for a que estiver tocando, a próxima música da lista deve ser tocada, caso exista
             if (selectedSongIndex == currentSongIndex && playing) {
                 deleteSong(selectedSongIndex);
 
                 stopPlaying();
 
-                // Próxima música começa a ser tocada caso haja alguma
                 if (songs.length > selectedSongIndex) {
                     startPlaying(selectedSongIndex);
+                }
+                else if (loop && songs.length > 0) {
+                    startPlaying(0);
                 }
             }
             else {
@@ -102,6 +109,13 @@ public class Player {
             if (songs.length < 2) {
                 EventQueue.invokeLater(() -> {
                     window.setEnabledShuffleButton(false);
+                });
+            }
+
+            // Atualiza o botão loop se necessário
+            if (songs.length == 0) {
+                EventQueue.invokeLater(() -> {
+                    window.setEnabledLoopButton(false);
                 });
             }
 
@@ -169,6 +183,13 @@ public class Player {
             // Atualiza o botão Shuffle se necessário
             if (songs.length == 2){
                 window.setEnabledShuffleButton(true);
+            }
+
+            // Atualiza o botão loop se necessário
+            if (songs.length == 1) {
+                EventQueue.invokeLater(() -> {
+                    window.setEnabledLoopButton(true);
+                });
             }
 
         } catch (IOException | InvalidDataException | BitstreamException | UnsupportedTagException ex) {
@@ -290,7 +311,7 @@ public class Player {
     };
     
     private final ActionListener buttonListenerLoop = e -> {
-        // TODO
+        loop = !loop;
     };
     private final MouseInputAdapter scrubberMouseInputAdapter = new MouseInputAdapter() {
         private int songLength;
@@ -564,7 +585,13 @@ public class Player {
                                     stopPlaying();
                                     startPlaying(currentSongIndex + 1);
 
-                                } else {
+                                }
+                                // Recomeça a lista de reprodução se o loop estiver ativo e essa for a última música
+                                else if (currentSongIndex == songs.length - 1 && loop) {
+                                    stopPlaying();
+                                    startPlaying(0);
+                                }
+                                else {
                                     stopPlaying();
                                 }
                             });
