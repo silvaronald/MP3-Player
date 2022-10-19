@@ -505,10 +505,6 @@ public class Player {
 
         currentSongIndex = songIndex;
 
-        for (int i = 0; i < 6; i++) {
-            System.out.println(songsInfo[currentSongIndex][i]);
-        }
-
         Song selected_song = songs[songIndex];
 
         // Cria a bitstream e o device
@@ -609,6 +605,7 @@ public class Player {
         String[][] auxSongsInfo = new String[songsInfo.length -1][];
 
         int counter = 0;
+        String id = songsInfo[index][5];
 
         for (int i = 0; i < songs.length; i++){
             if(i != index){
@@ -620,6 +617,25 @@ public class Player {
 
         songs = auxSongs;
         songsInfo = auxSongsInfo;
+
+        if (shuffle){ // Precisamos remover também quando o shuffle está ativo
+            auxSongs = new Song[regularSongs.length - 1];
+            auxSongsInfo = new String[regularSongsInfo.length - 1][];
+
+            counter = 0;
+
+
+            for (int i = 0; i < regularSongsInfo.length; i++){
+                if(!regularSongsInfo[i][5].equals(id)){
+                    auxSongs[counter] = regularSongs[i];
+                    auxSongsInfo[counter] = regularSongsInfo[i];
+                    counter ++;
+                }
+            }
+            regularSongs = auxSongs;
+            regularSongsInfo = auxSongsInfo;
+
+        }
 
         // Atualiza o currentSongIndex
         if (index < currentSongIndex) {
