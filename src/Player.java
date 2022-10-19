@@ -89,8 +89,11 @@ public class Player {
 
                 stopPlaying();
 
-                if (songs.length >= selectedSongIndex + 1) {
-                    startPlaying(selectedSongIndex);
+                // Próxima música começa a ser tocada caso haja alguma
+                if (playing) {
+                    if (songs.length >= selectedSongIndex + 1) {
+                        startPlaying(selectedSongIndex);
+                    }
                 }
             }
             else {
@@ -273,8 +276,6 @@ public class Player {
                         }
                     }
                 }
-
-                System.out.println(currentSongIndex);
             }
 
             // Atualiza a interface
@@ -602,43 +603,40 @@ public class Player {
 
     // Deleta a música selecionada da lista de reprodução
     private void deleteSong(int index){
+        String songId = songsInfo[index][5];
+
         // Faz cópias dos arrays songs e songsInfo deixando de fora o index a ser excluído
         Song[] auxSongs = new Song[songs.length-1];
-
         String[][] auxSongsInfo = new String[songsInfo.length -1][];
 
         int counter = 0;
-        String id = songsInfo[index][5];
 
         for (int i = 0; i < songs.length; i++){
             if(i != index){
                 auxSongs[counter] = songs[i];
                 auxSongsInfo[counter] = songsInfo[i];
-                counter ++;
+                counter++;
             }
         }
 
         songs = auxSongs;
         songsInfo = auxSongsInfo;
 
-        if (shuffle){ // Precisamos remover também quando o shuffle está ativo
-            auxSongs = new Song[regularSongs.length - 1];
-            auxSongsInfo = new String[regularSongsInfo.length - 1][];
+        // Precisamos realizar o mesmo processo para os arrays regularSongs e regularSongsInfo
+        auxSongs = new Song[regularSongs.length - 1];
+        auxSongsInfo = new String[regularSongsInfo.length - 1][];
 
-            counter = 0;
+        counter = 0;
 
-
-            for (int i = 0; i < regularSongsInfo.length; i++){
-                if(!regularSongsInfo[i][5].equals(id)){
-                    auxSongs[counter] = regularSongs[i];
-                    auxSongsInfo[counter] = regularSongsInfo[i];
-                    counter ++;
-                }
+        for (int i = 0; i < regularSongsInfo.length; i++){
+            if(!(regularSongsInfo[i][5] == songId)){
+                auxSongs[counter] = regularSongs[i];
+                auxSongsInfo[counter] = regularSongsInfo[i];
+                counter++;
             }
-            regularSongs = auxSongs;
-            regularSongsInfo = auxSongsInfo;
-
         }
+        regularSongs = auxSongs;
+        regularSongsInfo = auxSongsInfo;
 
         // Atualiza o currentSongIndex
         if (index < currentSongIndex) {
