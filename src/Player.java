@@ -84,16 +84,14 @@ public class Player {
             int selectedSongIndex = getSelectedSongIndex();
 
             // Se a música deletada for a que estiver tocando, a thread de reprodução deve ser parada
-            if (selectedSongIndex == currentSongIndex) {
+            if (selectedSongIndex == currentSongIndex && playing) {
                 deleteSong(selectedSongIndex);
 
                 stopPlaying();
 
                 // Próxima música começa a ser tocada caso haja alguma
-                if (playing) {
-                    if (songs.length >= selectedSongIndex + 1) {
-                        startPlaying(selectedSongIndex);
-                    }
+                if (songs.length > selectedSongIndex) {
+                    startPlaying(selectedSongIndex);
                 }
             }
             else {
