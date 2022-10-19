@@ -212,6 +212,7 @@ public class Player {
 
         nextThread.start();
     };
+    
     private final ActionListener buttonListenerPrevious = e -> {
         Thread previousThread = new Thread(() -> {
             stopPlaying();
@@ -221,6 +222,7 @@ public class Player {
 
         previousThread.start();
     };
+    
     private final ActionListener buttonListenerShuffle = e -> {
         Thread shuffleThread = new Thread(() -> {
             String currentSongId = songsInfo[currentSongIndex][5];
@@ -287,6 +289,7 @@ public class Player {
 
         shuffleThread.start();
     };
+    
     private final ActionListener buttonListenerLoop = e -> {
         // TODO
     };
