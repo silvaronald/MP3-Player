@@ -128,46 +128,52 @@ public class Player {
             if (songs != null) {
                 songs = Arrays.copyOf(songs, songs.length + 1);
                 songs[songs.length -1] = addedSong;
-
-                if (shuffle){ // Atualiza a cópia antes do shuffle se uma música foi adicionada enquanto
-                    // o botão de shuffle estava ativo
-                    regularSongs = Arrays.copyOf(songs, songs.length);
-                }
             }
-
             else {
                 songs = new Song[]{addedSong};
+            }
+
+            // Adiciona a música no array regularSongs
+            if (regularSongs != null) {
+                regularSongs = Arrays.copyOf(regularSongs, regularSongs.length + 1);
+                regularSongs[regularSongs.length -1] = addedSong;
+            }
+            else {
+                regularSongs = new Song[]{addedSong};
             }
 
             // Adiciona as informações da música no array songsInfo
             if (songsInfo != null){
                 songsInfo = Arrays.copyOf(songsInfo, songsInfo.length + 1);
-                songsInfo[songsInfo.length -1] = addedSongInfo;
-
-                if (shuffle){// Atualiza a cópia antes do shuffle se uma música foi adicionada enquanto
-                    // o botão de shuffle estava ativo
-                    regularSongsInfo = Arrays.copyOf(songsInfo, songsInfo.length);
-                }
+                songsInfo[songsInfo.length - 1] = addedSongInfo;
             }
-
             else {
                 songsInfo = new String[][]{addedSongInfo};
+            }
+
+            // Adiciona as informações da música no array regularSongsInfo
+            if (regularSongsInfo != null){
+                regularSongsInfo = Arrays.copyOf(regularSongsInfo, regularSongsInfo.length + 1);
+                regularSongsInfo[regularSongsInfo.length - 1] = addedSongInfo;
+            }
+            else {
+                regularSongsInfo = new String[][]{addedSongInfo};
             }
 
             // Atualiza a lista de reprodução
             window.setQueueList(songsInfo);
 
-            if (currentSongIndex == songs.length - 2 && playing){
+            if (currentSongIndex <= songs.length - 2 && playing) {
                 window.setEnabledNextButton(true);
+            }
+
+            // Atualiza o botão Shuffle se necessário
+            if (songs.length == 2){
+                window.setEnabledShuffleButton(true);
             }
 
         } catch (IOException | InvalidDataException | BitstreamException | UnsupportedTagException ex) {
             throw new RuntimeException(ex);
-        }
-
-        // Atualiza o botão Shuffle se necessário
-        if (songs.length > 1){
-            window.setEnabledShuffleButton(true);
         }
     };
 
@@ -208,6 +214,7 @@ public class Player {
 
         nextThread.start();
     };
+    
     private final ActionListener buttonListenerPrevious = e -> {
         Thread previousThread = new Thread(() -> {
             stopPlaying();
@@ -217,9 +224,10 @@ public class Player {
 
         previousThread.start();
     };
+    
     private final ActionListener buttonListenerShuffle = e -> {
         Thread shuffleThread = new Thread(() -> {
-            String currentSongId = songsInfo[currentSongIndex][4];
+            String currentSongId = songsInfo[currentSongIndex][5];
 
             if (!shuffle) {
                 shuffle = true;
@@ -235,10 +243,12 @@ public class Player {
                     for (int i = 0; i < songsInfo.length; i++) {
                         if (currentSongId == songsInfo[i][5]) {
                             String[] temp = songsInfo[0];
-
                             songsInfo[0] = songsInfo[i];
-
                             songsInfo[i] = temp;
+
+                            Song temp2 = songs[0];
+                            songs[0] = songs[i];
+                            songs[i] = temp2;
 
                             break;
                         }
@@ -272,12 +282,16 @@ public class Player {
             // Atualiza a interface
             EventQueue.invokeLater(() -> {
                 window.setQueueList(songsInfo);
-                updatePreviousAndNextButtons();
+
+                if (playing) {
+                    updatePreviousAndNextButtons();
+                }
             });
         });
 
         shuffleThread.start();
     };
+    
     private final ActionListener buttonListenerLoop = e -> {
         // TODO
     };
